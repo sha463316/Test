@@ -1,0 +1,386 @@
+{
+  "info": {
+    "name": "E-Commerce Backend Engine",
+    "description": "# E-Commerce Backend Engine — Postman Collection\n\n## 📋 المتطلبات\n\n### الطريقة الأولى: تشغيل محلي بدون Docker\n\n1. تأكد من Python 3.11+ مثبت:\n   ```bash\n   python --version\n   ```\n\n2. ثبت الحزم:\n   ```bash\n   cd ecommerce\n   pip install -r requirements.txt\n   ```\n\n3. هيّئ قاعدة البيانات (SQLite — بدون PostgreSQL):\n   ```bash\n   set DJANGO_SETTINGS_MODULE=config.settings.test\n   python manage.py migrate\n   python manage.py seed_data\n   ```\n\n4. شغّل السيرفر:\n   ```bash\n   python manage.py runserver --settings=config.settings.test\n   ```\n\n5. افتح Postman وابدأ الاختبار على `http://localhost:8000`\n\n### الطريقة الثانية: تشغيل عبر Docker (PostgreSQL + Redis + Celery كاملة)\n\n1. شغّل:\n   ```bash\n   cd ecommerce\n   docker-compose up --build\n   ```\n\n2. استخدم `http://localhost:80` كـ base_url (Nginx)\n\n## 🔑 معلومات المستخدم الافتراضي\n\nلا يوجد مستخدم مسبق — استخدم طلب **Register** لإنشاء مستخدم جديد.\nمثال:\n- username: `testuser`\n- email: `test@example.com`\n- password: `pass123`\n\n## 🔄 ترتيب التنفيذ\n\n1. **Register** → ينشئ مستخدم + محفظة (رصيد 1000)\n2. **Login** → يصادق ويُخزّن JWT token تلقائياً\n3. **Get Products** → يُخزّن product_id تلقائياً\n4. **Inventory List** → يعرض كل المخزون (يدعم `?low_stock=`)\n5. **Inventory Detail** → يعرض مخزون منتج معين\n6. **Inventory Restock** → يزيد كمية المخزون\n7. **Add to Cart** → يضيف منتج للسلة\n8. **Checkout** → ينشئ الطلب ويُخزّن order_id تلقائياً\n9. **Pay** → يدفع الطلب (مع 2s تأخير محاكي)\n\n## 🧪 اختبار Idempotency\n\nبعد تنفيذ **Pay** بنجاح، أعد إرسال نفس الطلب — يجب أن تحصل على رفض (429 أو 400).\n\n## 🧪 اختبار إدارة المخزون\n\nبعد **Get Products**، استخدم `product_id` في:\n- **Inventory Detail**: يعرض مخزون ذلك المنتج\n- **Inventory Restock**: يضيف 10 وحدات للمخزون (جسّب `product_id` من الخطوة 3)\n\n## 🗑️ إعادة تعيين البيانات\n\nإذا أردت البدء من جديد:\n```bash\npython manage.py flush --settings=config.settings.test\npython manage.py seed_data --settings=config.settings.test\n```\n\n## 📌 متغيرات Postman\n\n| المتغير | الوصف | يتم تعيينه بواسطة |\n|---------|-------|-------------------|\n| `base_url` | رابط السيرفر (افتراضي: `http://localhost:8000`) | أنت |\n| `token` | JWT token للمصادقة | Login / Register |\n| `product_id` | أول منتج من القائمة | Get Products |\n| `order_id` | معرف الطلب بعد Checkout | Checkout |",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "lastUpdated": "2026-05-17T00:00:00.000Z"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "product_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1️⃣ Register — تسجيل مستخدم جديد",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    var json = pm.response.json();",
+              "    pm.collectionVariables.set('token', json.access);",
+              "    console.log('✅ Registered. Token saved.');",
+              "} else {",
+              "    console.log('❌ Register failed:', pm.response.text());",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"username\": \"testuser\",\n    \"email\": \"test@example.com\",\n    \"password\": \"pass123\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/register/",
+          "host": ["{{base_url}}"],
+          "path": ["api", "auth", "register", ""]
+        },
+        "description": "ينشئ مستخدم جديد + محفظة برصيد 1000.\nيُخزّن JWT token تلقائياً في متغير `token`."
+      }
+    },
+    {
+      "name": "2️⃣ Login — تسجيل الدخول",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var json = pm.response.json();",
+              "    pm.collectionVariables.set('token', json.access);",
+              "    console.log('✅ Logged in. Token saved.');",
+              "} else {",
+              "    console.log('❌ Login failed:', pm.response.text());",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"username\": \"testuser\",\n    \"password\": \"pass123\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/login/",
+          "host": ["{{base_url}}"],
+          "path": ["api", "auth", "login", ""]
+        },
+        "description": "يصادق المستخدم ويُخزّن JWT token.\nاستخدم هذا إذا كنت سجّلت مسبقاً."
+      }
+    },
+    {
+      "name": "3️⃣ Get Products — قائمة المنتجات",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var json = pm.response.json();",
+              "    if (json.results && json.results.length > 0) {",
+              "        pm.collectionVariables.set('product_id', json.results[0].id);",
+              "        console.log('✅ Product ID saved:', json.results[0].id);",
+              "        console.log('   Product name:', json.results[0].name);",
+              "        console.log('   Stock:', json.results[0].stock);",
+              "    }",
+              "} else {",
+              "    console.log('❌ Products fetch failed:', pm.response.text());",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/products/?page=1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "products", ""],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            }
+          ]
+        },
+        "description": "يعرض المنتجات مع Pagination (20 لكل صفحة).\nيُخزّن ID أول منتج في `product_id`."
+      }
+    },
+    {
+      "name": "4️⃣ Inventory List — عرض المخزون",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var json = pm.response.json();",
+              "    console.log('✅ Inventory items:', json.length);",
+              "    if (json.length > 0) {",
+              "        console.log('   First item:', json[0].product_name, '- qty:', json[0].quantity);",
+              "    }",
+              "} else {",
+              "    console.log('❌ Inventory list failed:', pm.response.text());",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/inventory/",
+          "host": ["{{base_url}}"],
+          "path": ["api", "inventory", ""],
+          "query": [
+            {
+              "key": "low_stock",
+              "value": "",
+              "description": "اختياري: فلتر لعرض المنتجات فقط التي كميتها أقل من هذه القيمة"
+            }
+          ]
+        },
+        "description": "يعرض جميع المنتجات مع كميات المخزون.\nيدعم `?low_stock=10` لعرض المنتجات فقط التي كميتها أقل من 10."
+      }
+    },
+    {
+      "name": "5️⃣ Inventory Detail — تفاصيل مخزون منتج",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var json = pm.response.json();",
+              "    console.log('✅ Inventory:', json.product_name, '- qty:', json.quantity);",
+              "} else {",
+              "    console.log('❌ Inventory detail failed:', pm.response.text());",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/inventory/{{product_id}}/",
+          "host": ["{{base_url}}"],
+          "path": ["api", "inventory", "{{product_id}}", ""]
+        },
+        "description": "يعرض مخزون منتج معين باستخدام `product_id` من الخطوة 3."
+      }
+    },
+    {
+      "name": "6️⃣ Inventory Restock — إعادة تخزين",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var json = pm.response.json();",
+              "    console.log('✅ Restocked. New quantity:', json.new_quantity);",
+              "} else {",
+              "    console.log('❌ Restock failed:', pm.response.text());",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"quantity\": 10\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/inventory/{{product_id}}/restock/",
+          "host": ["{{base_url}}"],
+          "path": ["api", "inventory", "{{product_id}}", "restock", ""]
+        },
+        "description": "يُضيف كمية إلى مخزون المنتج. الكمية يجب أن تكون 1 على الأقل.\nيستخدم `product_id` من الخطوة 3."
+      }
+    },
+    {
+      "name": "7️⃣ Add to Cart — إضافة للسلة",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    console.log('✅ Added to cart');",
+              "} else {",
+              "    console.log('❌ Add to cart failed:', pm.response.text());",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"product\": \"{{product_id}}\",\n    \"quantity\": 1\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/cart/add/",
+          "host": ["{{base_url}}"],
+          "path": ["api", "cart", "add", ""]
+        },
+        "description": "يضيف منتجاً واحداً إلى سلة المستخدم.\nيتطلب `product_id` من الخطوة السابقة."
+      }
+    },
+    {
+      "name": "8️⃣ Checkout — إتمام الطلب",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "    var json = pm.response.json();",
+              "    pm.collectionVariables.set('order_id', json.order_id);",
+              "    console.log('✅ Checkout done. Order ID:', json.order_id);",
+              "    console.log('   Total:', json.total);",
+              "} else {",
+              "    console.log('❌ Checkout failed:', pm.response.text());",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/orders/checkout/",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", "checkout", ""]
+        },
+        "description": "ينشئ طلباً من محتويات السلة:\n- يقفل المخزون والمحفظة (FOR UPDATE)\n- يخصم الرصيد والمخزون\n- يُرسل مهمتي Celery (فاتورة + إشعار) في الخلفية\n\nيُخزّن `order_id` تلقائياً."
+      }
+    },
+    {
+      "name": "9️⃣ Pay — دفع الطلب",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var json = pm.response.json();",
+              "    console.log('✅ Payment successful:', json.status);",
+              "    console.log('   Payment ID:', json.payment_id);",
+              "} else if (pm.response.code === 429) {",
+              "    console.log('⚠️ Idempotency lock: payment already being processed');",
+              "} else if (pm.response.code === 400) {",
+              "    console.log('⚠️ Already paid:', pm.response.json().error);",
+              "} else {",
+              "    console.log('❌ Payment failed:', pm.response.text());",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"idempotency_key\": \"{{$guid}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/payments/pay/{{order_id}}/",
+          "host": ["{{base_url}}"],
+          "path": ["api", "payments", "pay", "{{order_id}}", ""]
+        },
+        "description": "يدفع الطلب (محاكاة 2 ثانية تأخير):\n1. قفل Idempotency (Redis SET NX EX 60)\n2. تحقق من حالة PENDING\n3. تأخير 2s\n4. تحديث الحالة إلى PAID\n\nأعد إرسال نفس الطلب لاختبار Idempotency — سترفض.\nيُستخدم `idempotency_key` فريد (GUID) لكل طلب."
+      }
+    }
+  ]
+}
