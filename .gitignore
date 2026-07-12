@@ -1,0 +1,53 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+
+# --- Virtual Environments ---
+.venv/
+venv/
+
+# --- IDE / Editor ---
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- Django / Database ---
+*.db
+*.sqlite3
+media/
+staticfiles/
+
+# --- Environment Variables ---
+.env
+.env.local
+.env.production
+
+# --- JMeter Results (large, regeneratable) ---
+*.jtl
+jmeter.log
+
+# --- JMeter HTML Reports (generated) ---
+before-report/
+after-report/
+
+# --- Archives / Backups ---
+*.rar
+*.zip
+*.tar.gz
+*.7z
+
+# --- Screenshots / Deliverable binaries (can be regenerated) ---
+tests/اختبارات/
+~$*
+
+# --- Logs ---
+logs/
+
+# --- OS ---
+Thumbs.db
+.DS_Store

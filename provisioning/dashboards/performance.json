@@ -1,0 +1,58 @@
+{
+  "uid": "ecommerce-live",
+  "title": "E-Commerce Live Performance",
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": {"from": "now-5m", "to": "now"},
+  "editable": true,
+  "panels": [
+    {
+      "title": "Request Rate",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 0, "w": 8, "h": 6},
+      "targets": [{"expr": "rate(django_http_requests_total_by_view_transport_method_total[30s])", "legendFormat": "{{view}} - {{method}}"}]
+    },
+    {
+      "title": "Response Time (ms)",
+      "type": "timeseries",
+      "gridPos": {"x": 8, "y": 0, "w": 8, "h": 6},
+      "targets": [{"expr": "rate(django_http_requests_latency_seconds_by_view_method_sum[30s]) / rate(django_http_requests_latency_seconds_by_view_method_count[30s]) * 1000", "legendFormat": "Avg"}]
+    },
+    {
+      "title": "P95 Response (ms)",
+      "type": "timeseries",
+      "gridPos": {"x": 16, "y": 0, "w": 8, "h": 6},
+      "targets": [{"expr": "histogram_quantile(0.95, rate(django_http_requests_latency_seconds_by_view_method_bucket[30s])) * 1000", "legendFormat": "P95"}]
+    },
+    {
+      "title": "Active Requests",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 6, "w": 8, "h": 6},
+      "targets": [{"expr": "django_http_requests_before_middlewares_total - django_http_responses_before_middlewares_total", "legendFormat": "In Flight"}]
+    },
+    {
+      "title": "DB Queries/s",
+      "type": "timeseries",
+      "gridPos": {"x": 8, "y": 6, "w": 8, "h": 6},
+      "targets": [{"expr": "rate(django_db_execute_total[30s])", "legendFormat": "Queries"}]
+    },
+    {
+      "title": "Error Rate",
+      "type": "timeseries",
+      "gridPos": {"x": 16, "y": 6, "w": 8, "h": 6},
+      "targets": [{"expr": "rate(django_http_responses_total_by_status_total{status=~\"5..\"}[30s])", "legendFormat": "5xx"}]
+    },
+    {
+      "title": "CPU Usage",
+      "type": "timeseries",
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 6},
+      "targets": [{"expr": "rate(process_cpu_seconds_total[30s]) * 100", "legendFormat": "CPU %"}]
+    },
+    {
+      "title": "Memory Usage",
+      "type": "timeseries",
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 6},
+      "targets": [{"expr": "process_resident_memory_bytes / 1024 / 1024", "legendFormat": "Memory MB"}]
+    }
+  ]
+}
